@@ -31,7 +31,11 @@ export function ExportButton() {
     if (!exportSource) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/export?range=${encodeURIComponent(exportSource.range)}`, {
+      const q = new URLSearchParams({
+        range: exportSource.range,
+        metric: exportSource.metric,
+      });
+      const res = await fetch(`/api/export?${q.toString()}`, {
         method: "GET",
       });
       if (!res.ok) throw new Error(`Falha ao exportar (${res.status})`);

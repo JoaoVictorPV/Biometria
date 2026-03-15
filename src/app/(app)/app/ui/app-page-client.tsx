@@ -35,8 +35,8 @@ export function AppPageClient({ userId, initialRows }: Props) {
   }, [rows]);
 
   useEffect(() => {
-    setExportSource({ rows: sortedRows, range });
-  }, [range, setExportSource, sortedRows]);
+    setExportSource({ rows: sortedRows, range, metric });
+  }, [metric, range, setExportSource, sortedRows]);
 
   async function onDelete(row: BiometricEntry) {
     // Evitar popups nativos (alert/confirm) conforme requisito.

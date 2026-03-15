@@ -180,7 +180,7 @@ export function InfoBar() {
 
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
         {/* Linha compacta (prioridade mobile) */}
-        <div className="no-scrollbar flex items-stretch justify-start gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-center sm:overflow-visible">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center">
           {data && !data.ok ? (
             <Chip
               icon={<Moon className="h-4 w-4" />}
@@ -231,7 +231,7 @@ export function InfoBar() {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="shrink-0 rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60 dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60"
+              className="col-span-2 shrink-0 rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60 sm:col-span-1 dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60"
             >
               {expanded ? "Menos" : "Mais"}
             </button>
@@ -241,7 +241,7 @@ export function InfoBar() {
         {/* Detalhes (opcional). No mobile fica escondido por padrão. */}
         {data && data.ok && expanded ? (
           <div className="space-y-2">
-            <div className="no-scrollbar flex items-stretch justify-start gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-center sm:overflow-visible">
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-center">
               {blocks?.waves.map((w) => (
                 <Chip
                   key={w.place}
@@ -249,12 +249,12 @@ export function InfoBar() {
                   title={w.place}
                   value={fmtWaves(w)}
                   tone="amber"
-                  className="min-w-[220px]"
+                  className="w-full sm:min-w-[220px]"
                 />
               ))}
             </div>
 
-            <div className="no-scrollbar flex items-stretch justify-start gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-center sm:overflow-visible">
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-center">
               {blocks?.forecast.map((d, idx) => (
                 <Chip
                   key={d.date}
@@ -262,7 +262,7 @@ export function InfoBar() {
                   title={idx === 0 ? "Amanhã • Curitiba" : `${formatDayBR(d.date)} • Curitiba`}
                   value={`${fmtC(d.tMinC)}–${fmtC(d.tMaxC)} • Sens ${fmtC(d.apparentTempMaxC)} • Orv ${fmtC(d.dewPointMaxC)} • Prec ${fmtMm(d.precipitationMm)}${fmtRainProb(d.rainProbMaxPct) ? ` • ${fmtRainProb(d.rainProbMaxPct)}` : ""}${d.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(d.cloudCoverAvgPct)}`}${d.windMaxKmh === null ? "" : ` • Vento ${formatNumber(d.windMaxKmh, 0)}km/h`}`}
                   tone="sky"
-                  className="min-w-[240px]"
+                  className="w-full sm:min-w-[240px]"
                 />
               ))}
             </div>

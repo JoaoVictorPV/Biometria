@@ -3,10 +3,12 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { BiometricEntry } from "@/lib/db/types";
 import type { RangeKey } from "@/components/biometrics/entries-chart";
+import type { FieldKey } from "@/components/biometrics/fields";
 
 export type ExportSource = {
   rows: BiometricEntry[];
   range: RangeKey;
+  metric: FieldKey;
 };
 
 type AppActionsContextValue = {

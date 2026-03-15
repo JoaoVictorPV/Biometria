@@ -30,6 +30,25 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+function isoToLocalInputValue(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // datetime-local exige formato local sem timezone.
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+function localInputValueToISO(v: unknown) {
+  if (v === "" || v === undefined || v === null) return nowISO();
+  const s = String(v);
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : nowISO();
+}
+
 type Props = {
   userId: string;
   editing?: BiometricEntry | null;
@@ -123,6 +142,27 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="measured_at">Data e hora</Label>
+              <Input
+                id="measured_at"
+                type="datetime-local"
+                defaultValue={isoToLocalInputValue(defaults.measured_at)}
+                {...register("measured_at", {
+                  setValueAs: localInputValueToISO,
+                })}
+              />
+              {errors.measured_at ? (
+                <p className="text-xs text-red-600">{errors.measured_at?.message as string}</p>
+              ) : (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  (Opcional) Você pode registrar medições antigas.
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {FIELD_DEFS.map((f) => (
               <div key={f.key} className="space-y-2">

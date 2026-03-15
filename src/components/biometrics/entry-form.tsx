@@ -30,6 +30,10 @@ function nowISO() {
   return new Date().toISOString();
 }
 
+function nowLocalInputValue() {
+  return isoToLocalInputValue(nowISO());
+}
+
 function isoToLocalInputValue(iso: string) {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -62,7 +66,7 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
   const defaults: BiometricEntryInput = useMemo(() => {
     if (!editing) {
       return {
-        measured_at: nowISO(),
+        measured_at: nowLocalInputValue(),
         weight_kg: null,
         body_fat_pct: null,
         body_water_pct: null,
@@ -79,7 +83,7 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
     }
 
     return {
-      measured_at: editing.measured_at,
+      measured_at: isoToLocalInputValue(editing.measured_at),
       weight_kg: editing.weight_kg,
       body_fat_pct: editing.body_fat_pct,
       body_water_pct: editing.body_water_pct,
@@ -109,13 +113,17 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
   async function onSubmit(input: BiometricEntryInput) {
     setSaving(true);
     try {
+      const inputFixed: BiometricEntryInput = {
+        ...input,
+        measured_at: localInputValueToISO(input.measured_at),
+      };
       const result = editing
-        ? await clientUpdateEntry(editing.id, input)
-        : await clientCreateEntry(userId, input);
+        ? await clientUpdateEntry(editing.id, inputFixed)
+        : await clientCreateEntry(userId, inputFixed);
 
       toast.success(editing ? "Registro atualizado" : "Registro salvo");
       onSaved?.(result.entry);
-      if (!editing) reset();
+      if (!editing) reset({ ...defaults, measured_at: nowLocalInputValue() });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao salvar";
       toast.error(msg);
@@ -148,10 +156,7 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
               <Input
                 id="measured_at"
                 type="datetime-local"
-                defaultValue={isoToLocalInputValue(defaults.measured_at)}
-                {...register("measured_at", {
-                  setValueAs: localInputValueToISO,
-                })}
+                {...register("measured_at")}
               />
               {errors.measured_at ? (
                 <p className="text-xs text-red-600">{errors.measured_at?.message as string}</p>
@@ -164,7 +169,7 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {FIELD_DEFS.map((f) => (
+            {FIELD_DEFS.filter((f) => f.key !== "glucose_mg_dl").map((f) => (
               <div key={f.key} className="space-y-2">
                 <Label htmlFor={f.key}>
                   {f.label}
@@ -187,22 +192,38 @@ export function EntryForm({ userId, editing, onSaved, onCancelEdit }: Props) {
                 ) : null}
               </div>
             ))}
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações (opcional)</Label>
-            <textarea
-              id="notes"
-              className="min-h-24 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-visible:ring-zinc-700"
-              placeholder="Ex.: jejum, pós-treino, etc."
-              {...register("notes", {
-                setValueAs: (v) => {
-                  if (v === "" || v === undefined || v === null) return null;
-                  const s = String(v).trim();
-                  return s ? s : null;
-                },
-              })}
-            />
+            {/* Glicemia (esquerda) + Observações (direita) */}
+            <div className="space-y-2">
+              <Label htmlFor="glucose_mg_dl">Glicemia</Label>
+              <Input
+                id="glucose_mg_dl"
+                inputMode="numeric"
+                type="number"
+                step={"1"}
+                {...register("glucose_mg_dl", {
+                  setValueAs: toIntOrNull,
+                })}
+              />
+              {errors.glucose_mg_dl ? (
+                <p className="text-xs text-red-600">{errors.glucose_mg_dl?.message as string}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Input
+                id="notes"
+                placeholder="Opcional"
+                {...register("notes", {
+                  setValueAs: (v) => {
+                    if (v === "" || v === undefined || v === null) return null;
+                    const s = String(v).trim();
+                    return s ? s : null;
+                  },
+                })}
+              />
+            </div>
           </div>
 
           <Button type="submit" className="w-full" disabled={saving}>

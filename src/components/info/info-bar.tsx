@@ -69,17 +69,25 @@ function Chip({
   value,
   tone,
   className,
+  open,
+  onToggle,
 }: {
   icon: React.ReactNode;
   title: string;
   value: string;
   tone: Tone;
   className?: string;
+  open?: boolean;
+  onToggle?: () => void;
 }) {
+  const Comp = onToggle ? ("button" as const) : ("div" as const);
   return (
-    <div
+    <Comp
+      type={onToggle ? "button" : undefined}
+      onClick={onToggle}
       className={cn(
-        "flex shrink-0 items-center gap-2 rounded-2xl border border-zinc-200/70 bg-white/70 px-3 py-2 text-xs shadow-sm backdrop-blur dark:border-zinc-800/70 dark:bg-zinc-950/60",
+        "flex shrink-0 items-center gap-2 rounded-2xl border border-zinc-200/70 bg-white/70 px-3 py-2 text-left text-xs shadow-sm backdrop-blur dark:border-zinc-800/70 dark:bg-zinc-950/60",
+        onToggle ? "hover:bg-white/85 dark:hover:bg-zinc-950/75" : null,
         className,
       )}
       title={title}
@@ -87,9 +95,16 @@ function Chip({
       <div className={cn("rounded-xl p-1", toneCls(tone))}>{icon}</div>
       <div className="min-w-0">
         <div className="truncate font-medium text-zinc-800 dark:text-zinc-100">{title}</div>
-        <div className="truncate text-zinc-600 dark:text-zinc-400">{value}</div>
+        <div
+          className={cn(
+            "text-zinc-600 dark:text-zinc-400",
+            open ? "whitespace-normal break-words" : "truncate",
+          )}
+        >
+          {value}
+        </div>
       </div>
-    </div>
+    </Comp>
   );
 }
 
@@ -133,6 +148,7 @@ function fmtWaves(w: WaveBlock) {
 export function InfoBar() {
   const [data, setData] = useState<Payload | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [openChipId, setOpenChipId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -178,15 +194,17 @@ export function InfoBar() {
         <div className="h-full w-full bg-[radial-gradient(circle_at_15%_0%,rgba(14,165,233,0.16),transparent_45%),radial-gradient(circle_at_85%_10%,rgba(168,85,247,0.12),transparent_45%),radial-gradient(circle_at_65%_80%,rgba(16,185,129,0.10),transparent_55%)] dark:bg-[radial-gradient(circle_at_15%_0%,rgba(14,165,233,0.14),transparent_45%),radial-gradient(circle_at_85%_10%,rgba(168,85,247,0.10),transparent_45%),radial-gradient(circle_at_65%_80%,rgba(16,185,129,0.08),transparent_55%)]" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
+      <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2">
         {/* Linha compacta (prioridade mobile) */}
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center">
+        <div className="flex w-full flex-wrap justify-center gap-2">
           {data && !data.ok ? (
             <Chip
               icon={<Moon className="h-4 w-4" />}
               title="Info"
               value="Indisponível"
               tone="violet"
+              open={openChipId === "info"}
+              onToggle={() => setOpenChipId((v) => (v === "info" ? null : "info"))}
             />
           ) : null}
 
@@ -196,6 +214,9 @@ export function InfoBar() {
               title="Curitiba"
               value={`${blocks.curitiba.weatherDescNow ?? "Tempo"} • T ${fmtC(blocks.curitiba.tempNowC)} • Sens ${fmtC(blocks.curitiba.apparentTempNowC)} • Orv ${fmtC(blocks.curitiba.dewPointNowC)} • UR ${fmtPct(blocks.curitiba.humidityNowPct)} • Prec ${fmtMm(blocks.curitiba.precipitationTodayMm)}${fmtRainProb(blocks.curitiba.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.curitiba.rainProbTodayPct)}` : ""}${blocks.curitiba.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(blocks.curitiba.cloudCoverNowPct)}`}${blocks.curitiba.windDirNowDeg === null || blocks.curitiba.windDirNowDeg === undefined ? "" : ` • Vento ${degToCardinal(blocks.curitiba.windDirNowDeg)}`}`}
               tone="sky"
+              className="w-[min(100%,520px)]"
+              open={openChipId === "curitiba"}
+              onToggle={() => setOpenChipId((v) => (v === "curitiba" ? null : "curitiba"))}
             />
           ) : null}
 
@@ -205,6 +226,9 @@ export function InfoBar() {
               title="Pontal"
               value={`${blocks.pontal.weatherDescNow ?? "Tempo"} • T ${fmtC(blocks.pontal.tempNowC)} • Sens ${fmtC(blocks.pontal.apparentTempNowC)} • Orv ${fmtC(blocks.pontal.dewPointNowC)} • UR ${fmtPct(blocks.pontal.humidityNowPct)} • Prec ${fmtMm(blocks.pontal.precipitationTodayMm)}${fmtRainProb(blocks.pontal.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.pontal.rainProbTodayPct)}` : ""}${blocks.pontal.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(blocks.pontal.cloudCoverNowPct)}`}${blocks.pontal.windDirNowDeg === null || blocks.pontal.windDirNowDeg === undefined ? "" : ` • Vento ${degToCardinal(blocks.pontal.windDirNowDeg)}`}`}
               tone="emerald"
+              className="w-[min(100%,520px)]"
+              open={openChipId === "pontal"}
+              onToggle={() => setOpenChipId((v) => (v === "pontal" ? null : "pontal"))}
             />
           ) : null}
 
@@ -214,6 +238,8 @@ export function InfoBar() {
               title="Lua"
               value={data.moon.name}
               tone="violet"
+              open={openChipId === "lua"}
+              onToggle={() => setOpenChipId((v) => (v === "lua" ? null : "lua"))}
             />
           ) : null}
 
@@ -223,7 +249,9 @@ export function InfoBar() {
               title="Hoje"
               value={`Curitiba • ${fmtC(blocks.today.tMinC)}–${fmtC(blocks.today.tMaxC)} • Sens ${fmtC(blocks.today.apparentTempMaxC)} • Orv ${fmtC(blocks.today.dewPointMaxC)} • Prec ${fmtMm(blocks.today.precipitationMm)}${fmtRainProb(blocks.today.rainProbMaxPct) ? ` • ${fmtRainProb(blocks.today.rainProbMaxPct)}` : ""}${blocks.today.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(blocks.today.cloudCoverAvgPct)}`}`}
               tone="sky"
-              className="min-w-[180px]"
+              className="w-[min(100%,520px)]"
+              open={openChipId === "hoje"}
+              onToggle={() => setOpenChipId((v) => (v === "hoje" ? null : "hoje"))}
             />
           ) : null}
 
@@ -231,7 +259,7 @@ export function InfoBar() {
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="col-span-2 shrink-0 rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60 sm:col-span-1 dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60"
+              className="shrink-0 rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60 dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60"
             >
               {expanded ? "Menos" : "Mais"}
             </button>
@@ -241,7 +269,7 @@ export function InfoBar() {
         {/* Detalhes (opcional). No mobile fica escondido por padrão. */}
         {data && data.ok && expanded ? (
           <div className="space-y-2">
-            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-center">
+            <div className="flex w-full flex-wrap justify-center gap-2">
               {blocks?.waves.map((w) => (
                 <Chip
                   key={w.place}
@@ -249,12 +277,16 @@ export function InfoBar() {
                   title={w.place}
                   value={fmtWaves(w)}
                   tone="amber"
-                  className="w-full sm:min-w-[220px]"
+                  className="w-[min(100%,520px)]"
+                  open={openChipId === `wave-${w.place}`}
+                  onToggle={() =>
+                    setOpenChipId((v) => (v === `wave-${w.place}` ? null : `wave-${w.place}`))
+                  }
                 />
               ))}
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:justify-center">
+            <div className="flex w-full flex-wrap justify-center gap-2">
               {blocks?.forecast.map((d, idx) => (
                 <Chip
                   key={d.date}
@@ -262,7 +294,9 @@ export function InfoBar() {
                   title={idx === 0 ? "Amanhã • Curitiba" : `${formatDayBR(d.date)} • Curitiba`}
                   value={`${fmtC(d.tMinC)}–${fmtC(d.tMaxC)} • Sens ${fmtC(d.apparentTempMaxC)} • Orv ${fmtC(d.dewPointMaxC)} • Prec ${fmtMm(d.precipitationMm)}${fmtRainProb(d.rainProbMaxPct) ? ` • ${fmtRainProb(d.rainProbMaxPct)}` : ""}${d.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(d.cloudCoverAvgPct)}`}${d.windMaxKmh === null ? "" : ` • Vento ${formatNumber(d.windMaxKmh, 0)}km/h`}`}
                   tone="sky"
-                  className="w-full sm:min-w-[240px]"
+                  className="w-[min(100%,520px)]"
+                  open={openChipId === `fc-${d.date}`}
+                  onToggle={() => setOpenChipId((v) => (v === `fc-${d.date}` ? null : `fc-${d.date}`))}
                 />
               ))}
             </div>

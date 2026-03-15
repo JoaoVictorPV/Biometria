@@ -52,8 +52,27 @@ function rangeLabel(range: RangeKey) {
   return range.replace("d", " dias");
 }
 
-function makeMetricSeries(rows: BiometricEntry[], key: FieldKey) {
-  return [...rows]
+function maxPointsForRange(range: RangeKey) {
+  // Mesma ideia do app: resolução define densidade, sem estourar performance.
+  return range === "1d"
+    ? 48
+    : range === "7d"
+      ? 140
+      : range === "1m"
+        ? 240
+        : range === "6m"
+          ? 300
+          : 360;
+}
+
+function downsample<T>(arr: T[], max: number) {
+  if (arr.length <= max) return arr;
+  const step = Math.ceil(arr.length / max);
+  return arr.filter((_, idx) => idx % step === 0);
+}
+
+function makeMetricSeries(rows: BiometricEntry[], key: FieldKey, range: RangeKey) {
+  const series = [...rows]
     .slice(0, 5000)
     .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime())
     .map((r) => {
@@ -62,6 +81,8 @@ function makeMetricSeries(rows: BiometricEntry[], key: FieldKey) {
       return { t, v };
     })
     .filter((p) => p.v !== null && Number.isFinite(p.t));
+
+  return downsample(series, maxPointsForRange(range));
 }
 
 export function buildExportHtml(args: {
@@ -111,7 +132,7 @@ export function buildExportHtml(args: {
         key: k,
         label: def.label,
         unit: def.unit ?? "",
-        series: makeMetricSeries(filtered, k),
+        series: makeMetricSeries(filtered, k, args.range),
       };
     })
     .filter((m) => m.series.length > 0);
@@ -145,11 +166,11 @@ td.dt .d{font-weight:700}
 td.dt .t{color:var(--muted);font-size:11px;margin-top:2px}
 td.notes{max-width:380px;white-space:normal}
 .charts{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
-.chart{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:10px}
+.chart{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:10px;display:flex;flex-direction:column;height:320px}
 .chart .h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 4px 10px}
 .chart .h b{font-size:12px}
 .chart .h span{font-size:11px;color:var(--muted)}
-.chart canvas{display:block;width:100%;height:240px}
+.chart canvas{display:block;width:100% !important;height:100% !important;flex:1;min-height:0}
 `;
 
   const brandSvg = `
@@ -228,7 +249,7 @@ ${args.chartJsBundle}
     const EXPORT = ${dataJson};
 
     function fmtDate(t){
-      const d = new Date(t);
+      const d = new Date(Number(t));
       return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
     }
 
@@ -251,16 +272,18 @@ ${args.chartJsBundle}
       if (!ctx) return;
 
       const color = palette[idx % palette.length];
-      const labels = (m.series || []).map(p => fmtDate(p.t));
-      const values = (m.series || []).map(p => p.v);
+      const points = (m.series || []).map(p => ({ x: p.t, y: p.v }));
+
+      // Define tamanho fixo do canvas (evita "crescer" infinitamente em alguns browsers mobile)
+      canvas.width = Math.max(900, el.clientWidth || 900);
+      canvas.height = 260;
 
       new Chart(ctx, {
         type: 'line',
         data: {
-          labels,
           datasets: [{
             label: m.label,
-            data: values,
+            data: points,
             borderColor: color,
             backgroundColor: color + '22',
             borderWidth: 2.5,
@@ -270,9 +293,11 @@ ${args.chartJsBundle}
           }]
         },
         options: {
-          responsive: true,
+          responsive: false,
           maintainAspectRatio: false,
           animation: false,
+          parsing: false,
+          devicePixelRatio: 1,
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -287,8 +312,13 @@ ${args.chartJsBundle}
           },
           scales: {
             x: {
+              type: 'linear',
               grid: { color: 'rgba(15,23,42,.06)' },
-              ticks: { maxTicksLimit: 6, color: 'rgba(15,23,42,.75)' }
+              ticks: {
+                maxTicksLimit: 6,
+                color: 'rgba(15,23,42,.75)',
+                callback: (v) => fmtDate(v),
+              }
             },
             y: {
               grid: { color: 'rgba(15,23,42,.06)' },

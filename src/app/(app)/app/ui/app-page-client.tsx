@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { BiometricEntry } from "@/lib/db/types";
 import { clientDeleteEntry } from "@/lib/data/client";
@@ -8,7 +8,8 @@ import { EntryForm } from "@/components/biometrics/entry-form";
 import { EntriesByDay } from "@/components/biometrics/entries-by-day";
 import { EntriesChart } from "@/components/biometrics/entries-chart";
 import type { FieldKey } from "@/components/biometrics/fields";
-import { SyncButton } from "@/components/biometrics/sync-button";
+import type { RangeKey } from "@/components/biometrics/entries-chart";
+import { useAppActions } from "@/components/app-actions-context";
 
 type Props = {
   userId: string;
@@ -19,6 +20,9 @@ export function AppPageClient({ userId, initialRows }: Props) {
   const [rows, setRows] = useState<BiometricEntry[]>(initialRows);
   const [editing, setEditing] = useState<BiometricEntry | null>(null);
   const [metric, setMetric] = useState<FieldKey>("weight_kg");
+  const [range, setRange] = useState<RangeKey>("1m");
+
+  const { setExportSource } = useAppActions();
 
   const sortedRows = useMemo(() => {
     return [...rows].sort((a, b) => {
@@ -29,6 +33,10 @@ export function AppPageClient({ userId, initialRows }: Props) {
       return tb - ta;
     });
   }, [rows]);
+
+  useEffect(() => {
+    setExportSource({ rows: sortedRows, range });
+  }, [range, setExportSource, sortedRows]);
 
   async function onDelete(row: BiometricEntry) {
     // Evitar popups nativos (alert/confirm) conforme requisito.
@@ -56,10 +64,6 @@ export function AppPageClient({ userId, initialRows }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <SyncButton onSynced={(nextRows) => setRows(nextRows)} />
-      </div>
-
       <EntryForm
         userId={userId}
         editing={editing}
@@ -73,7 +77,13 @@ export function AppPageClient({ userId, initialRows }: Props) {
         }}
       />
 
-      <EntriesChart rows={sortedRows} metric={metric} onMetricChange={setMetric} />
+      <EntriesChart
+        rows={sortedRows}
+        metric={metric}
+        onMetricChange={setMetric}
+        range={range}
+        onRangeChange={setRange}
+      />
       <EntriesByDay rows={sortedRows} onEdit={setEditing} onDelete={onDelete} />
     </div>
   );

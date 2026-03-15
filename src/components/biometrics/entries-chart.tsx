@@ -8,11 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { FIELD_DEFS, type FieldKey } from "./fields";
 
-type RangeKey = "7d" | "30d" | "90d" | "all";
-const RANGES: Array<{ value: RangeKey; label: string }> = [
+export type RangeKey = "2d" | "7d" | "1m" | "6m" | "all";
+export const RANGES: Array<{ value: RangeKey; label: string }> = [
+  { value: "2d", label: "2d" },
   { value: "7d", label: "7d" },
-  { value: "30d", label: "30d" },
-  { value: "90d", label: "90d" },
+  { value: "1m", label: "1m" },
+  { value: "6m", label: "6m" },
   { value: "all", label: "Tudo" },
 ];
 
@@ -20,11 +21,15 @@ type Props = {
   rows: BiometricEntry[];
   metric: FieldKey;
   onMetricChange: (m: FieldKey) => void;
+  range?: RangeKey;
+  onRangeChange?: (r: RangeKey) => void;
 };
 
-export function EntriesChart({ rows, metric, onMetricChange }: Props) {
-  // range default: 30d (mais limpo no celular)
-  const [range, setRange] = useState<RangeKey>("30d");
+export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChange }: Props) {
+  // range default: 1m (mais limpo no celular)
+  const [internalRange, setInternalRange] = useState<RangeKey>("1m");
+  const currentRange = range ?? internalRange;
+  const setRange = onRangeChange ?? setInternalRange;
 
   const metricDef = FIELD_DEFS.find((f) => f.key === metric)!;
   const options = FIELD_DEFS.map((f) => ({
@@ -39,13 +44,15 @@ export function EntriesChart({ rows, metric, onMetricChange }: Props) {
     // Importante: para manter render puro, NÃO usamos Date.now().
     // A janela é calculada em relação ao registro mais recente.
     const ms =
-      range === "7d"
-        ? 7 * 864e5
-        : range === "30d"
-          ? 30 * 864e5
-          : range === "90d"
-            ? 90 * 864e5
-            : null;
+      currentRange === "2d"
+        ? 2 * 864e5
+        : currentRange === "7d"
+          ? 7 * 864e5
+          : currentRange === "1m"
+            ? 30 * 864e5
+            : currentRange === "6m"
+              ? 180 * 864e5
+              : null;
 
     const times = rows
       .map((r) => new Date(r.measured_at).getTime())
@@ -69,7 +76,7 @@ export function EntriesChart({ rows, metric, onMetricChange }: Props) {
         value: r[metric],
       }))
       .filter((d) => d.value !== null && Number.isFinite(d.t));
-  }, [rows, metric, range]);
+  }, [rows, metric, currentRange]);
 
   return (
     <Card>
@@ -82,13 +89,20 @@ export function EntriesChart({ rows, metric, onMetricChange }: Props) {
             ) : null}
           </CardTitle>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {range === "all" ? "Todas as medições" : `Últimos ${range.replace("d", " dias")}`}.
+            {currentRange === "all"
+              ? "Todas as medições"
+              : currentRange === "1m"
+                ? "Último 1 mês"
+                : currentRange === "6m"
+                  ? "Últimos 6 meses"
+                  : `Últimos ${currentRange.replace("d", " dias")}`}
+            .
           </p>
         </div>
         <div className="flex flex-col gap-2 overflow-x-auto sm:items-end">
           <Segmented value={metric} onChange={onMetricChange} options={metricOptions} />
           <div className="flex justify-end">
-            <Segmented value={range} onChange={setRange} options={RANGES} />
+            <Segmented value={currentRange} onChange={setRange} options={RANGES} />
           </div>
         </div>
       </CardHeader>

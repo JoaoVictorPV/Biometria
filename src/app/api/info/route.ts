@@ -9,6 +9,9 @@ type ForecastDay = {
   tMinC: number | null;
   precipitationMm: number | null;
   rainProbMaxPct: number | null;
+  cloudCoverAvgPct: number | null;
+  dewPointMaxC: number | null;
+  apparentTempMaxC: number | null;
   windMaxKmh: number | null;
 };
 
@@ -18,7 +21,16 @@ type WeatherBlock = {
   humidityNowPct: number | null;
   weatherDescNow: string | null;
   rainProbTodayPct: number | null;
+  precipitationTodayMm: number | null;
+  cloudCoverNowPct: number | null;
+  dewPointNowC: number | null;
+  apparentTempNowC: number | null;
   forecast: ForecastDay[];
+};
+
+type WindBlock = {
+  place: string;
+  windDirNowDeg: number | null;
 };
 
 type WaveBlock = {
@@ -61,16 +73,26 @@ async function getWeatherFor(placeKey: keyof typeof PLACES): Promise<WeatherBloc
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", String(p.lat));
   url.searchParams.set("longitude", String(p.lon));
-  url.searchParams.set("current", "temperature_2m,relative_humidity_2m,weather_code");
+  url.searchParams.set(
+    "current",
+    "temperature_2m,relative_humidity_2m,weather_code,apparent_temperature,dew_point_2m,cloud_cover",
+  );
   url.searchParams.set(
     "daily",
-    "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max",
+    "temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,cloud_cover_mean,dew_point_2m_max,apparent_temperature_max",
   );
   url.searchParams.set("timezone", "America/Sao_Paulo");
   url.searchParams.set("forecast_days", "4");
 
   const json = (await fetchJson(url.toString())) as {
-    current?: { temperature_2m?: number; relative_humidity_2m?: number; weather_code?: number };
+    current?: {
+      temperature_2m?: number;
+      relative_humidity_2m?: number;
+      weather_code?: number;
+      apparent_temperature?: number;
+      dew_point_2m?: number;
+      cloud_cover?: number;
+    };
     daily?: {
       time?: string[];
       temperature_2m_max?: Array<number | null>;
@@ -78,6 +100,9 @@ async function getWeatherFor(placeKey: keyof typeof PLACES): Promise<WeatherBloc
       precipitation_sum?: Array<number | null>;
       precipitation_probability_max?: Array<number | null>;
       wind_speed_10m_max?: Array<number | null>;
+      cloud_cover_mean?: Array<number | null>;
+      dew_point_2m_max?: Array<number | null>;
+      apparent_temperature_max?: Array<number | null>;
     };
   };
 
@@ -87,10 +112,14 @@ async function getWeatherFor(placeKey: keyof typeof PLACES): Promise<WeatherBloc
     tMinC: json?.daily?.temperature_2m_min?.[i] ?? null,
     precipitationMm: json?.daily?.precipitation_sum?.[i] ?? null,
     rainProbMaxPct: json?.daily?.precipitation_probability_max?.[i] ?? null,
+    cloudCoverAvgPct: json?.daily?.cloud_cover_mean?.[i] ?? null,
+    dewPointMaxC: json?.daily?.dew_point_2m_max?.[i] ?? null,
+    apparentTempMaxC: json?.daily?.apparent_temperature_max?.[i] ?? null,
     windMaxKmh: json?.daily?.wind_speed_10m_max?.[i] ?? null,
   }));
 
   const rainProbTodayPct = forecast[0]?.rainProbMaxPct ?? null;
+  const precipitationTodayMm = forecast[0]?.precipitationMm ?? null;
   const weatherDescNow = weatherCodeToDesc(json?.current?.weather_code);
 
   return {
@@ -99,7 +128,29 @@ async function getWeatherFor(placeKey: keyof typeof PLACES): Promise<WeatherBloc
     humidityNowPct: json?.current?.relative_humidity_2m ?? null,
     weatherDescNow,
     rainProbTodayPct,
+    precipitationTodayMm,
+    cloudCoverNowPct: json?.current?.cloud_cover ?? null,
+    dewPointNowC: json?.current?.dew_point_2m ?? null,
+    apparentTempNowC: json?.current?.apparent_temperature ?? null,
     forecast,
+  };
+}
+
+async function getWindNowFor(placeKey: keyof typeof PLACES): Promise<WindBlock> {
+  const p = PLACES[placeKey];
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", String(p.lat));
+  url.searchParams.set("longitude", String(p.lon));
+  url.searchParams.set("current", "wind_direction_10m");
+  url.searchParams.set("timezone", "America/Sao_Paulo");
+
+  const json = (await fetchJson(url.toString())) as {
+    current?: { wind_direction_10m?: number };
+  };
+
+  return {
+    place: p.name,
+    windDirNowDeg: json?.current?.wind_direction_10m ?? null,
   };
 }
 
@@ -137,6 +188,13 @@ export async function GET() {
         getWeatherFor("pontal"),
       ]);
 
+      // Direção do vento atual para ajudar leitura humana.
+      // (Ondas já têm direção em graus no endpoint marinho.)
+      const [windCuritiba, windPontal] = await Promise.all([
+        getWindNowFor("curitiba"),
+        getWindNowFor("pontal"),
+      ]);
+
       const waves = await Promise.all([
         getWavesFor("ilha_do_mel"),
         getWavesFor("brava_itajai"),
@@ -148,7 +206,10 @@ export async function GET() {
       return {
         ok: true,
         updatedAt: new Date().toISOString(),
-        weather: [curitiba, pontal],
+        weather: [
+          { ...curitiba, windDirNowDeg: windCuritiba.windDirNowDeg },
+          { ...pontal, windDirNowDeg: windPontal.windDirNowDeg },
+        ],
         waves,
         moon,
       };

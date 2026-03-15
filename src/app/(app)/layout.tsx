@@ -1,11 +1,16 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { AppActionsProvider } from "@/components/app-actions-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isLocalMode } from "@/lib/data/mode";
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   if (isLocalMode()) {
-    return <AppShell>{children}</AppShell>;
+    return (
+      <AppActionsProvider>
+        <AppShell>{children}</AppShell>
+      </AppActionsProvider>
+    );
   }
 
   const supabase = await createSupabaseServerClient();
@@ -15,5 +20,9 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   if (!user) redirect("/auth");
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppActionsProvider>
+      <AppShell>{children}</AppShell>
+    </AppActionsProvider>
+  );
 }

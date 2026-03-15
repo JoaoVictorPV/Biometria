@@ -11,6 +11,9 @@ type ForecastDay = {
   tMinC: number | null;
   precipitationMm: number | null;
   rainProbMaxPct: number | null;
+  cloudCoverAvgPct: number | null;
+  dewPointMaxC: number | null;
+  apparentTempMaxC: number | null;
   windMaxKmh: number | null;
 };
 
@@ -20,6 +23,11 @@ type WeatherBlock = {
   humidityNowPct: number | null;
   weatherDescNow: string | null;
   rainProbTodayPct: number | null;
+  precipitationTodayMm: number | null;
+  cloudCoverNowPct: number | null;
+  dewPointNowC: number | null;
+  apparentTempNowC: number | null;
+  windDirNowDeg?: number | null;
   forecast: ForecastDay[];
 };
 
@@ -95,10 +103,22 @@ function fmtPct(n: number | null) {
   return `${formatNumber(n, 0)}%`;
 }
 
+function fmtMm(n: number | null) {
+  if (n === null) return "—";
+  return `${formatNumber(n, 1)}mm`;
+}
+
 function fmtRainProb(n: number | null) {
   if (n === null) return null;
   const v = Math.round(n);
   return `chuva ${v}%`;
+}
+
+function degToCardinal(deg: number | null | undefined) {
+  if (deg === null || deg === undefined) return "—";
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const idx = Math.round((((deg % 360) + 360) % 360) / 45) % 8;
+  return dirs[idx];
 }
 
 function fmtWaves(w: WaveBlock) {
@@ -106,7 +126,8 @@ function fmtWaves(w: WaveBlock) {
   const p = w.wavePeriodMaxS === null ? "—" : `${formatNumber(w.wavePeriodMaxS, 0)}s`;
   const d =
     w.waveDirectionDominantDeg === null ? "—" : `${formatNumber(w.waveDirectionDominantDeg, 0)}°`;
-  return `${h} • ${p} • ${d}`;
+  const c = degToCardinal(w.waveDirectionDominantDeg);
+  return `${h} • ${p} • ${d} (${c})`;
 }
 
 export function InfoBar() {
@@ -173,7 +194,7 @@ export function InfoBar() {
             <Chip
               icon={<Thermometer className="h-4 w-4" />}
               title="Curitiba"
-              value={`${blocks.curitiba.weatherDescNow ?? "Tempo"} • ${fmtC(blocks.curitiba.tempNowC)} • ${fmtPct(blocks.curitiba.humidityNowPct)}${fmtRainProb(blocks.curitiba.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.curitiba.rainProbTodayPct)}` : ""}`}
+              value={`${blocks.curitiba.weatherDescNow ?? "Tempo"} • T ${fmtC(blocks.curitiba.tempNowC)} • Sens ${fmtC(blocks.curitiba.apparentTempNowC)} • Orv ${fmtC(blocks.curitiba.dewPointNowC)} • UR ${fmtPct(blocks.curitiba.humidityNowPct)} • Prec ${fmtMm(blocks.curitiba.precipitationTodayMm)}${fmtRainProb(blocks.curitiba.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.curitiba.rainProbTodayPct)}` : ""}${blocks.curitiba.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(blocks.curitiba.cloudCoverNowPct)}`}${blocks.curitiba.windDirNowDeg === null || blocks.curitiba.windDirNowDeg === undefined ? "" : ` • Vento ${degToCardinal(blocks.curitiba.windDirNowDeg)}`}`}
               tone="sky"
             />
           ) : null}
@@ -182,7 +203,7 @@ export function InfoBar() {
             <Chip
               icon={<Thermometer className="h-4 w-4" />}
               title="Pontal"
-              value={`${blocks.pontal.weatherDescNow ?? "Tempo"} • ${fmtC(blocks.pontal.tempNowC)} • ${fmtPct(blocks.pontal.humidityNowPct)}${fmtRainProb(blocks.pontal.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.pontal.rainProbTodayPct)}` : ""}`}
+              value={`${blocks.pontal.weatherDescNow ?? "Tempo"} • T ${fmtC(blocks.pontal.tempNowC)} • Sens ${fmtC(blocks.pontal.apparentTempNowC)} • Orv ${fmtC(blocks.pontal.dewPointNowC)} • UR ${fmtPct(blocks.pontal.humidityNowPct)} • Prec ${fmtMm(blocks.pontal.precipitationTodayMm)}${fmtRainProb(blocks.pontal.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.pontal.rainProbTodayPct)}` : ""}${blocks.pontal.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(blocks.pontal.cloudCoverNowPct)}`}${blocks.pontal.windDirNowDeg === null || blocks.pontal.windDirNowDeg === undefined ? "" : ` • Vento ${degToCardinal(blocks.pontal.windDirNowDeg)}`}`}
               tone="emerald"
             />
           ) : null}
@@ -200,7 +221,7 @@ export function InfoBar() {
             <Chip
               icon={<Droplets className="h-4 w-4" />}
               title="Hoje"
-              value={`${fmtC(blocks.today.tMinC)}–${fmtC(blocks.today.tMaxC)} • ${blocks.today.precipitationMm ?? 0}mm${fmtRainProb(blocks.today.rainProbMaxPct) ? ` • ${fmtRainProb(blocks.today.rainProbMaxPct)}` : ""}`}
+              value={`Curitiba • ${fmtC(blocks.today.tMinC)}–${fmtC(blocks.today.tMaxC)} • Sens ${fmtC(blocks.today.apparentTempMaxC)} • Orv ${fmtC(blocks.today.dewPointMaxC)} • Prec ${fmtMm(blocks.today.precipitationMm)}${fmtRainProb(blocks.today.rainProbMaxPct) ? ` • ${fmtRainProb(blocks.today.rainProbMaxPct)}` : ""}${blocks.today.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(blocks.today.cloudCoverAvgPct)}`}`}
               tone="sky"
               className="min-w-[180px]"
             />
@@ -234,12 +255,12 @@ export function InfoBar() {
             </div>
 
             <div className="no-scrollbar flex items-stretch justify-start gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:justify-center sm:overflow-visible">
-              {blocks?.forecast.map((d) => (
+              {blocks?.forecast.map((d, idx) => (
                 <Chip
                   key={d.date}
                   icon={<Droplets className="h-4 w-4" />}
-                  title={formatDayBR(d.date)}
-                  value={`${fmtC(d.tMinC)}–${fmtC(d.tMaxC)} • ${d.precipitationMm ?? 0}mm • ${d.windMaxKmh ?? 0}km/h`}
+                  title={idx === 0 ? "Amanhã • Curitiba" : `${formatDayBR(d.date)} • Curitiba`}
+                  value={`${fmtC(d.tMinC)}–${fmtC(d.tMaxC)} • Sens ${fmtC(d.apparentTempMaxC)} • Orv ${fmtC(d.dewPointMaxC)} • Prec ${fmtMm(d.precipitationMm)}${fmtRainProb(d.rainProbMaxPct) ? ` • ${fmtRainProb(d.rainProbMaxPct)}` : ""}${d.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(d.cloudCoverAvgPct)}`}${d.windMaxKmh === null ? "" : ` • Vento ${formatNumber(d.windMaxKmh, 0)}km/h`}`}
                   tone="sky"
                   className="min-w-[240px]"
                 />

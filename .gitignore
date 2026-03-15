@@ -22,6 +22,10 @@
 
 # misc
 .DS_Store
+
+# local-only
+.env.local
+.local/
 *.pem
 
 # debug

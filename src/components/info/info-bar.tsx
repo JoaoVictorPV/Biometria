@@ -300,19 +300,18 @@ export function InfoBar() {
             />
           ) : null}
 
+          {/* Lua (inerte): sem clique/expansão */}
           {data && data.ok ? (
-            <button
-              type="button"
-              onClick={() => setOpenChipId((v) => (v === "lua" ? null : "lua"))}
+            <div
               className={cn(
-                "flex items-center justify-center rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60",
-                "dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60",
+                "flex items-center justify-center rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs text-zinc-700 shadow-sm backdrop-blur",
+                "dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200",
               )}
               title={data.moon.name}
             >
               <Moon className="h-4 w-4" />
               <span className="ml-2 truncate">{data.moon.name}</span>
-            </button>
+            </div>
           ) : null}
         </div>
 
@@ -357,19 +356,6 @@ export function InfoBar() {
               </div>
             ) : null}
 
-            {/* Lua ficou na linha principal; aqui só mostramos se o usuário abrir */}
-            {openChipId === "lua" ? (
-              <div className="grid w-full grid-cols-1 gap-2">
-                <Chip
-                  icon={<Moon className="h-4 w-4" />}
-                  title="Lua"
-                  value={data.moon.name}
-                  tone="violet"
-                  className="w-full"
-                />
-              </div>
-            ) : null}
-
             {blocks?.waves?.length ? (
               <div className="grid w-full grid-cols-3 gap-2">
                 {blocks.waves.slice(0, 3).map((w) => (
@@ -380,10 +366,7 @@ export function InfoBar() {
                     value={fmtWaves(w)}
                     tone="amber"
                     className="w-full"
-                    open={openChipId === `wave-${w.place}`}
-                    onToggle={() =>
-                      setOpenChipId((v) => (v === `wave-${w.place}` ? null : `wave-${w.place}`))
-                    }
+                    // Praias/ondas devem ser inertes aos cliques
                   />
                 ))}
               </div>

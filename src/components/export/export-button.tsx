@@ -21,6 +21,17 @@ export function ExportButton() {
   const { exportSource } = useAppActions();
   const [busy, setBusy] = useState(false);
 
+  function captureChartSvgFromDom(): string | null {
+    try {
+      // No mobile, o timing do useEffect pode não ter gravado o SVG a tempo.
+      // Aqui a gente captura no clique, direto do DOM, garantindo cópia fiel.
+      const svg = document.querySelector(".recharts-wrapper svg") as SVGSVGElement | null;
+      return svg?.outerHTML ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   const disabledReason = useMemo(() => {
     if (!exportSource) return "Abra o painel para carregar os dados";
     if (exportSource.rows.length === 0) return "Sem registros para exportar";
@@ -31,6 +42,8 @@ export function ExportButton() {
     if (!exportSource) return;
     setBusy(true);
     try {
+      const chartSvg = captureChartSvgFromDom() ?? exportSource.chartSvg ?? null;
+
       // Preferimos POST para enviar o SVG real do gráfico atual (cópia fiel).
       // Mantém GET como fallback automático no server (se SVG não vier).
       const res = await fetch(`/api/export`, {
@@ -39,7 +52,7 @@ export function ExportButton() {
         body: JSON.stringify({
           range: exportSource.range,
           metric: exportSource.metric,
-          chartSvg: exportSource.chartSvg ?? null,
+          chartSvg,
         }),
       });
       if (!res.ok) throw new Error(`Falha ao exportar (${res.status})`);

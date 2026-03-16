@@ -181,6 +181,10 @@ function fullForecastDay(d: ForecastDay) {
   return parts.join(" • ");
 }
 
+function forecastTitle(place: string) {
+  return `Previsão — ${place}`;
+}
+
 function compactWeather(w: WeatherBlock) {
   // Resumo útil (retraído): tempo + temperatura + sensação + chuva%.
   const desc = w.weatherDescNow ?? "Tempo";
@@ -332,7 +336,7 @@ export function InfoBar() {
                     <Chip
                       key={d.date}
                       icon={<Droplets className="h-4 w-4" />}
-                      title="Previsão"
+                      title={forecastTitle("Curitiba")}
                       value={open ? fullForecastDay(d) : compactForecastDay(d)}
                       tone="sky"
                       className="w-full"

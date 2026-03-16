@@ -8,6 +8,12 @@ import { buildExportHtml } from "@/lib/export/export-html";
 import fs from "node:fs";
 import path from "node:path";
 
+type ExportBody = {
+  range?: RangeKey;
+  metric?: FieldKey;
+  chartSvg?: string | null;
+};
+
 function asRangeKey(v: string | null): RangeKey {
   if (v === "1d" || v === "7d" || v === "1m" || v === "6m" || v === "1y") return v;
   return "1m";
@@ -22,6 +28,26 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const range = asRangeKey(url.searchParams.get("range"));
   const metric = asFieldKey(url.searchParams.get("metric"));
+
+  return await handleExport({ range, metric, chartSvg: null });
+}
+
+export async function POST(request: Request) {
+  let body: ExportBody | null = null;
+  try {
+    body = (await request.json()) as ExportBody;
+  } catch {
+    body = null;
+  }
+
+  const range = asRangeKey(body?.range ?? null);
+  const metric = asFieldKey(body?.metric ?? null);
+  const chartSvg = typeof body?.chartSvg === "string" ? body.chartSvg : null;
+
+  return await handleExport({ range, metric, chartSvg });
+}
+
+async function handleExport(args: { range: RangeKey; metric: FieldKey | null; chartSvg: string | null }) {
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -40,13 +66,14 @@ export async function GET(request: Request) {
   const bundlePath = path.join(process.cwd(), "src", "lib", "export", "chartjs.bundle.min.js");
   const chartJsBundle = fs.readFileSync(bundlePath, "utf8");
 
-  const fieldDefs = metric ? FIELD_DEFS.filter((f) => f.key === metric) : FIELD_DEFS;
+  const fieldDefs = args.metric ? FIELD_DEFS.filter((f) => f.key === args.metric) : FIELD_DEFS;
 
   const html = buildExportHtml({
     rows: data ?? [],
-    range,
+    range: args.range,
     fieldDefs,
     chartJsBundle,
+    chartSvg: args.chartSvg,
   });
 
   return new NextResponse(html, {

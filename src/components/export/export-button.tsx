@@ -31,12 +31,16 @@ export function ExportButton() {
     if (!exportSource) return;
     setBusy(true);
     try {
-      const q = new URLSearchParams({
-        range: exportSource.range,
-        metric: exportSource.metric,
-      });
-      const res = await fetch(`/api/export?${q.toString()}`, {
-        method: "GET",
+      // Preferimos POST para enviar o SVG real do gráfico atual (cópia fiel).
+      // Mantém GET como fallback automático no server (se SVG não vier).
+      const res = await fetch(`/api/export`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          range: exportSource.range,
+          metric: exportSource.metric,
+          chartSvg: exportSource.chartSvg ?? null,
+        }),
       });
       if (!res.ok) throw new Error(`Falha ao exportar (${res.status})`);
 

@@ -35,7 +35,14 @@ export function AppPageClient({ userId, initialRows }: Props) {
   }, [rows]);
 
   useEffect(() => {
-    setExportSource({ rows: sortedRows, range, metric });
+    setExportSource((prev) => {
+      const keepSvg =
+        prev && prev.metric === metric && prev.range === range && prev.rows === sortedRows
+          ? prev.chartSvg ?? null
+          : null;
+
+      return { rows: sortedRows, range, metric, chartSvg: keepSvg };
+    });
   }, [metric, range, setExportSource, sortedRows]);
 
   async function onDelete(row: BiometricEntry) {

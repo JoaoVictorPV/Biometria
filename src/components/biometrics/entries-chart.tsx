@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { BiometricEntry } from "@/lib/db/types";
 import { formatDateTimeBR } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Segmented } from "@/components/ui/segmented";
 import { FIELD_DEFS, type FieldKey } from "./fields";
+import { useAppActions } from "@/components/app-actions-context";
 
 export type RangeKey = "1d" | "7d" | "1m" | "6m" | "1y";
 export const RANGES: Array<{ value: RangeKey; label: string }> = [
@@ -30,6 +31,10 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
   const [internalRange, setInternalRange] = useState<RangeKey>("1m");
   const currentRange = range ?? internalRange;
   const setRange = onRangeChange ?? setInternalRange;
+
+  const { setExportSource } = useAppActions();
+  const chartRootRef = useRef<HTMLDivElement | null>(null);
+  const lastSvgRef = useRef<string | null>(null);
 
   const metricDef = FIELD_DEFS.find((f) => f.key === metric)!;
   const options = FIELD_DEFS.map((f) => ({
@@ -84,6 +89,31 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
     return windowed.filter((_, idx) => idx % step === 0);
   }, [rows, metric, currentRange]);
 
+  useEffect(() => {
+    // Captura o SVG real renderizado pelo Recharts para exportação.
+    // Isso garante “cópia fiel” do que o app está mostrando.
+    const id = window.setTimeout(() => {
+      try {
+        const svg = chartRootRef.current?.querySelector("svg");
+        const html = svg?.outerHTML ?? null;
+        if (!html || html === lastSvgRef.current) return;
+        lastSvgRef.current = html;
+
+        setExportSource((prev) => {
+          if (!prev) return prev;
+          // Só atualiza se a exportSource atual bate com a tela.
+          if (prev.metric !== metric || prev.range !== currentRange) return prev;
+          if (prev.rows !== rows) return prev;
+          return { ...prev, chartSvg: html };
+        });
+      } catch {
+        // silencioso
+      }
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, [currentRange, data.length, metric, rows, setExportSource]);
+
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -113,7 +143,7 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
             </div>
           ) : (
             <div className="-mx-4 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="h-72 min-w-[860px]">
+              <div ref={chartRootRef} className="h-72 min-w-[860px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <XAxis
@@ -155,6 +185,7 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
             </div>
           )}
         </div>
+
       </CardContent>
     </Card>
   );

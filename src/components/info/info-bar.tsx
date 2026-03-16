@@ -162,6 +162,25 @@ function nextForecastDays(days: ForecastDay[]) {
   return withoutToday.slice(0, 3);
 }
 
+function compactForecastDay(d: ForecastDay) {
+  const rain = d.rainProbMaxPct === null ? null : `Chuva ${formatNumber(d.rainProbMaxPct, 0)}%`;
+  return `${formatDayBR(d.date)} • ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}${rain ? ` • ${rain}` : ""}`;
+}
+
+function fullForecastDay(d: ForecastDay) {
+  const parts = [
+    `${formatDayBR(d.date)} • ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}`,
+    d.rainProbMaxPct === null ? null : `Chuva ${formatNumber(d.rainProbMaxPct, 0)}%`,
+    d.precipitationMm === null ? null : `Prec ${fmtMm(d.precipitationMm)}`,
+    d.cloudCoverAvgPct === null ? null : `Nuv ${fmtPct(d.cloudCoverAvgPct)}`,
+    d.dewPointMaxC === null ? null : `Orv ${fmtC(d.dewPointMaxC)}`,
+    d.apparentTempMaxC === null ? null : `Sens ${fmtC(d.apparentTempMaxC)}`,
+    d.windMaxKmh === null ? null : `Vento ${formatNumber(d.windMaxKmh, 0)}km/h`,
+  ].filter(Boolean) as string[];
+
+  return parts.join(" • ");
+}
+
 function compactWeather(w: WeatherBlock) {
   // Resumo útil (retraído): tempo + temperatura + sensação + chuva%.
   const desc = w.weatherDescNow ?? "Tempo";
@@ -303,27 +322,31 @@ export function InfoBar() {
         {/* Expandido: organizado por função, simétrico e horizontal */}
         {data && data.ok && expanded ? (
           <div className="space-y-2">
-            <div className="grid w-full grid-cols-2 gap-2">
-              {blocks?.forecastNext?.length ? (
-                <Chip
-                  icon={<Droplets className="h-4 w-4" />}
-                  title="Previsão (Curitiba)"
-                  value={blocks.forecastNext
-                    .map((d) =>
-                      `${formatDayBR(d.date)} ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}${
-                        d.rainProbMaxPct === null ? "" : ` • Chuva ${formatNumber(d.rainProbMaxPct, 0)}%`
-                      }`,
-                    )
-                    .join(" • ")}
-                  tone="sky"
-                  className="w-full"
-                  open={openChipId === "forecast"}
-                  onToggle={() => setOpenChipId((v) => (v === "forecast" ? null : "forecast"))}
-                />
-              ) : null}
+            {/* Previsão em 3 cards simétricos (amanhã + próximos 2 dias) */}
+            {blocks?.forecastNext?.length ? (
+              <div className="grid w-full grid-cols-3 gap-2">
+                {blocks.forecastNext.map((d) => {
+                  const id = `fc-${d.date}`;
+                  const open = openChipId === id;
+                  return (
+                    <Chip
+                      key={d.date}
+                      icon={<Droplets className="h-4 w-4" />}
+                      title="Previsão"
+                      value={open ? fullForecastDay(d) : compactForecastDay(d)}
+                      tone="sky"
+                      className="w-full"
+                      open={open}
+                      onToggle={() => setOpenChipId((v) => (v === id ? null : id))}
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
 
-              {/* Lua ficou na linha principal; aqui só mostramos se o usuário abrir */}
-              {openChipId === "lua" ? (
+            {/* Lua ficou na linha principal; aqui só mostramos se o usuário abrir */}
+            {openChipId === "lua" ? (
+              <div className="grid w-full grid-cols-1 gap-2">
                 <Chip
                   icon={<Moon className="h-4 w-4" />}
                   title="Lua"
@@ -331,8 +354,8 @@ export function InfoBar() {
                   tone="violet"
                   className="w-full"
                 />
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             {blocks?.waves?.length ? (
               <div className="grid w-full grid-cols-3 gap-2">

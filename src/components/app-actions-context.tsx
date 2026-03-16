@@ -9,11 +9,12 @@ export type ExportSource = {
   rows: BiometricEntry[];
   range: RangeKey;
   metric: FieldKey;
+  chartSvg?: string | null;
 };
 
 type AppActionsContextValue = {
   exportSource: ExportSource | null;
-  setExportSource: (v: ExportSource | null) => void;
+  setExportSource: React.Dispatch<React.SetStateAction<ExportSource | null>>;
 };
 
 const AppActionsContext = createContext<AppActionsContextValue | null>(null);

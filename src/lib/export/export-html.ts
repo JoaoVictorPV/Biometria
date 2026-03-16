@@ -72,6 +72,7 @@ export function buildExportHtml(args: {
   range: RangeKey;
   fieldDefs: FieldDef[];
   chartJsBundle: string;
+  chartSvg?: string | null;
 }) {
   // Espelho fiel do app:
   // - O range define janela (x-axis) a partir do registro mais recente.
@@ -152,6 +153,8 @@ td.dt .d{font-weight:700}
 td.dt .t{color:var(--muted);font-size:11px;margin-top:2px}
 td.notes{max-width:380px;white-space:normal}
 .charts{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
+.svgWrap{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:12px;overflow:hidden}
+.svgWrap svg{width:100%;height:auto;display:block}
 .chart{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:10px;display:flex;flex-direction:column;height:320px}
 .chart .h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 4px 10px}
 .chart .h b{font-size:12px}
@@ -229,100 +232,62 @@ td.notes{max-width:380px;white-space:normal}
   </div>
 
   <script>
-${args.chartJsBundle}
-  </script>
-  <script>
-    const EXPORT = ${dataJson};
-
-    function fmtDate(t){
-      const d = new Date(Number(t));
-      return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
-    }
-
+    // Preferência: se recebemos um SVG do próprio app (Recharts), usamos ele.
+    // Isso garante cópia fiel, sem depender de Chart.js.
+    const CHART_SVG = ${JSON.stringify(args.chartSvg ?? null)};
     const container = document.getElementById('charts');
-    const palette = ['#0ea5e9', '#a78bfa', '#34d399', '#f59e0b', '#ef4444'];
 
-    (EXPORT.charts || []).forEach((m, idx) => {
+    if (CHART_SVG && container) {
       const el = document.createElement('div');
-      el.className = 'chart';
-      el.innerHTML = '<div class="h"><b></b><span></span></div><canvas></canvas>';
-      const b = el.querySelector('b');
-      const span = el.querySelector('span');
-      if (b) b.textContent = String(m.label ?? '');
-      if (span) span.textContent = m.unit ? "(" + m.unit + ")" : '';
+      el.className = 'svgWrap';
+      el.innerHTML = CHART_SVG;
       container.appendChild(el);
-
-      const canvas = el.querySelector('canvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const color = palette[idx % palette.length];
-      const points = (m.series || []).map(p => ({ x: p.t, y: p.v }));
-      if (!points.length) {
-        el.style.display = 'none';
-        return;
+    } else {
+      // Fallback: Chart.js offline (caso o SVG não venha).
+      ${args.chartJsBundle}
+      const EXPORT = ${dataJson};
+      function fmtDate(t){
+        const d = new Date(Number(t));
+        return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
       }
-
-      // Define tamanho fixo do canvas (evita "crescer" infinitamente em alguns browsers mobile)
-      canvas.width = Math.max(900, el.clientWidth || 900);
-      canvas.height = 260;
-
-      const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          datasets: [{
-            label: m.label,
-            data: points,
-            borderColor: color,
-            backgroundColor: color + '22',
-            borderWidth: 2.5,
-            pointRadius: 0,
-            tension: 0.25,
-            fill: true,
-          }]
-        },
-        options: {
-          responsive: false,
-          maintainAspectRatio: false,
-          animation: false,
-          parsing: false,
-          devicePixelRatio: 1,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: 'rgba(2,6,23,.92)',
-              borderColor: 'rgba(255,255,255,.12)',
-              borderWidth: 1,
-              titleColor: 'white',
-              bodyColor: 'white',
-              padding: 10,
-              displayColors: false,
-            }
-          },
-          scales: {
-            x: {
-              type: 'linear',
-              grid: { color: 'rgba(15,23,42,.06)' },
-              ticks: {
-                maxTicksLimit: 6,
-                color: 'rgba(15,23,42,.75)',
-                callback: (v) => fmtDate(v),
-              }
-            },
-            y: {
-              grid: { color: 'rgba(15,23,42,.06)' },
-              ticks: { color: 'rgba(15,23,42,.75)' }
+      const palette = ['#0ea5e9', '#a78bfa', '#34d399', '#f59e0b', '#ef4444'];
+      (EXPORT.charts || []).forEach((m, idx) => {
+        const el = document.createElement('div');
+        el.className = 'chart';
+        el.innerHTML = '<div class="h"><b></b><span></span></div><canvas></canvas>';
+        const b = el.querySelector('b');
+        const span = el.querySelector('span');
+        if (b) b.textContent = String(m.label ?? '');
+        if (span) span.textContent = m.unit ? "(" + m.unit + ")" : '';
+        container.appendChild(el);
+        const canvas = el.querySelector('canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const color = palette[idx % palette.length];
+        const points = (m.series || []).map(p => ({ x: p.t, y: p.v }));
+        if (!points.length) { el.style.display = 'none'; return; }
+        canvas.width = Math.max(900, el.clientWidth || 900);
+        canvas.height = 260;
+        const chart = new Chart(ctx, {
+          type: 'line',
+          data: { datasets: [{ label: m.label, data: points, borderColor: color, backgroundColor: color + '22', borderWidth: 2.5, pointRadius: 0, tension: 0.25, fill: true }] },
+          options: {
+            responsive: false,
+            maintainAspectRatio: false,
+            animation: false,
+            parsing: false,
+            devicePixelRatio: 1,
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(2,6,23,.92)', borderColor: 'rgba(255,255,255,.12)', borderWidth: 1, titleColor: 'white', bodyColor: 'white', padding: 10, displayColors: false } },
+            scales: {
+              x: { type: 'linear', grid: { color: 'rgba(15,23,42,.06)' }, ticks: { maxTicksLimit: 6, color: 'rgba(15,23,42,.75)', callback: (v) => fmtDate(v) } },
+              y: { grid: { color: 'rgba(15,23,42,.06)' }, ticks: { color: 'rgba(15,23,42,.75)' } }
             }
           }
-        }
+        });
+        setTimeout(() => { try { chart.resize(); chart.update('none'); } catch {} }, 0);
       });
-
-      // Reflow pós-layout (iOS às vezes calcula 0px no primeiro frame)
-      setTimeout(() => {
-        try { chart.resize(); chart.update('none'); } catch {}
-      }, 0);
-    });
+    }
   </script>
 </body>
 </html>`;

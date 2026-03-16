@@ -145,6 +145,24 @@ function fmtWaves(w: WaveBlock) {
   return `${h} • ${p} • ${d} (${c})`;
 }
 
+function compactWeather(w: WeatherBlock) {
+  // Resumo útil (retraído): tempo + temperatura + sensação + chuva%.
+  const desc = w.weatherDescNow ?? "Tempo";
+  const t = fmtC(w.tempNowC);
+  const sens = fmtC(w.apparentTempNowC);
+  const rain = w.rainProbTodayPct === null ? null : `${Math.round(w.rainProbTodayPct)}% chuva`;
+  return `${desc} • ${t} • Sens ${sens}${rain ? ` • ${rain}` : ""}`;
+}
+
+function fullWeather(w: WeatherBlock) {
+  const rainProb = fmtRainProb(w.rainProbTodayPct);
+  const wind =
+    w.windDirNowDeg === null || w.windDirNowDeg === undefined
+      ? null
+      : `Vento ${degToCardinal(w.windDirNowDeg)}`;
+  return `${w.weatherDescNow ?? "Tempo"} • T ${fmtC(w.tempNowC)} • Sens ${fmtC(w.apparentTempNowC)} • Orv ${fmtC(w.dewPointNowC)} • UR ${fmtPct(w.humidityNowPct)} • Prec ${fmtMm(w.precipitationTodayMm)}${rainProb ? ` • ${rainProb}` : ""}${w.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(w.cloudCoverNowPct)}`}${wind ? ` • ${wind}` : ""}`;
+}
+
 export function InfoBar() {
   const [data, setData] = useState<Payload | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -195,8 +213,8 @@ export function InfoBar() {
       </div>
 
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2">
-        {/* Linha compacta (prioridade mobile) */}
-        <div className="flex w-full flex-wrap justify-center gap-2">
+        {/* Retráido: apenas hoje de Curitiba + Pontal, lado a lado e compacto */}
+        <div className="grid w-full grid-cols-2 gap-2">
           {data && !data.ok ? (
             <Chip
               icon={<Moon className="h-4 w-4" />}
@@ -212,9 +230,9 @@ export function InfoBar() {
             <Chip
               icon={<Thermometer className="h-4 w-4" />}
               title="Curitiba"
-              value={`${blocks.curitiba.weatherDescNow ?? "Tempo"} • T ${fmtC(blocks.curitiba.tempNowC)} • Sens ${fmtC(blocks.curitiba.apparentTempNowC)} • Orv ${fmtC(blocks.curitiba.dewPointNowC)} • UR ${fmtPct(blocks.curitiba.humidityNowPct)} • Prec ${fmtMm(blocks.curitiba.precipitationTodayMm)}${fmtRainProb(blocks.curitiba.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.curitiba.rainProbTodayPct)}` : ""}${blocks.curitiba.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(blocks.curitiba.cloudCoverNowPct)}`}${blocks.curitiba.windDirNowDeg === null || blocks.curitiba.windDirNowDeg === undefined ? "" : ` • Vento ${degToCardinal(blocks.curitiba.windDirNowDeg)}`}`}
+              value={openChipId === "curitiba" ? fullWeather(blocks.curitiba) : compactWeather(blocks.curitiba)}
               tone="sky"
-              className="w-[min(100%,520px)]"
+              className="w-full"
               open={openChipId === "curitiba"}
               onToggle={() => setOpenChipId((v) => (v === "curitiba" ? null : "curitiba"))}
             />
@@ -224,82 +242,76 @@ export function InfoBar() {
             <Chip
               icon={<Thermometer className="h-4 w-4" />}
               title="Pontal"
-              value={`${blocks.pontal.weatherDescNow ?? "Tempo"} • T ${fmtC(blocks.pontal.tempNowC)} • Sens ${fmtC(blocks.pontal.apparentTempNowC)} • Orv ${fmtC(blocks.pontal.dewPointNowC)} • UR ${fmtPct(blocks.pontal.humidityNowPct)} • Prec ${fmtMm(blocks.pontal.precipitationTodayMm)}${fmtRainProb(blocks.pontal.rainProbTodayPct) ? ` • ${fmtRainProb(blocks.pontal.rainProbTodayPct)}` : ""}${blocks.pontal.cloudCoverNowPct === null ? "" : ` • Nuv ${fmtPct(blocks.pontal.cloudCoverNowPct)}`}${blocks.pontal.windDirNowDeg === null || blocks.pontal.windDirNowDeg === undefined ? "" : ` • Vento ${degToCardinal(blocks.pontal.windDirNowDeg)}`}`}
+              value={openChipId === "pontal" ? fullWeather(blocks.pontal) : compactWeather(blocks.pontal)}
               tone="emerald"
-              className="w-[min(100%,520px)]"
+              className="w-full"
               open={openChipId === "pontal"}
               onToggle={() => setOpenChipId((v) => (v === "pontal" ? null : "pontal"))}
             />
           ) : null}
-
-          {data && data.ok ? (
-            <Chip
-              icon={<Moon className="h-4 w-4" />}
-              title="Lua"
-              value={data.moon.name}
-              tone="violet"
-              open={openChipId === "lua"}
-              onToggle={() => setOpenChipId((v) => (v === "lua" ? null : "lua"))}
-            />
-          ) : null}
-
-          {blocks?.today ? (
-            <Chip
-              icon={<Droplets className="h-4 w-4" />}
-              title="Hoje"
-              value={`Curitiba • ${fmtC(blocks.today.tMinC)}–${fmtC(blocks.today.tMaxC)} • Sens ${fmtC(blocks.today.apparentTempMaxC)} • Orv ${fmtC(blocks.today.dewPointMaxC)} • Prec ${fmtMm(blocks.today.precipitationMm)}${fmtRainProb(blocks.today.rainProbMaxPct) ? ` • ${fmtRainProb(blocks.today.rainProbMaxPct)}` : ""}${blocks.today.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(blocks.today.cloudCoverAvgPct)}`}`}
-              tone="sky"
-              className="w-[min(100%,520px)]"
-              open={openChipId === "hoje"}
-              onToggle={() => setOpenChipId((v) => (v === "hoje" ? null : "hoje"))}
-            />
-          ) : null}
-
-          {data && data.ok ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="shrink-0 rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60 dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60"
-            >
-              {expanded ? "Menos" : "Mais"}
-            </button>
-          ) : null}
         </div>
 
-        {/* Detalhes (opcional). No mobile fica escondido por padrão. */}
+        {data && data.ok ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={cn(
+              "w-full rounded-2xl border px-4 py-2 text-sm font-semibold shadow-sm backdrop-blur",
+              "border-zinc-200/70 bg-white/50 text-zinc-800 hover:bg-white/70",
+              "dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-100 dark:hover:bg-zinc-950/60",
+            )}
+          >
+            {expanded ? "Menos" : "Mais detalhes"}
+          </button>
+        ) : null}
+
+        {/* Expandido: organizado por função, simétrico e horizontal */}
         {data && data.ok && expanded ? (
           <div className="space-y-2">
-            <div className="flex w-full flex-wrap justify-center gap-2">
-              {blocks?.waves.map((w) => (
+            <div className="grid w-full grid-cols-2 gap-2">
+              {blocks?.forecast?.[0] ? (
                 <Chip
-                  key={w.place}
-                  icon={<Waves className="h-4 w-4" />}
-                  title={w.place}
-                  value={fmtWaves(w)}
-                  tone="amber"
-                  className="w-[min(100%,520px)]"
-                  open={openChipId === `wave-${w.place}`}
-                  onToggle={() =>
-                    setOpenChipId((v) => (v === `wave-${w.place}` ? null : `wave-${w.place}`))
-                  }
+                  icon={<Droplets className="h-4 w-4" />}
+                  title="Previsão (Curitiba)"
+                  value={`${formatDayBR(blocks.forecast[0].date)} • ${fmtC(blocks.forecast[0].tMinC)}–${fmtC(blocks.forecast[0].tMaxC)} • ${blocks.forecast[0].rainProbMaxPct === null ? "" : `Chuva ${formatNumber(blocks.forecast[0].rainProbMaxPct, 0)}%`}`.trim()}
+                  tone="sky"
+                  className="w-full"
+                  open={openChipId === "forecast"}
+                  onToggle={() => setOpenChipId((v) => (v === "forecast" ? null : "forecast"))}
                 />
-              ))}
+              ) : null}
+
+              {data.moon ? (
+                <Chip
+                  icon={<Moon className="h-4 w-4" />}
+                  title="Lua"
+                  value={data.moon.name}
+                  tone="violet"
+                  className="w-full"
+                  open={openChipId === "lua"}
+                  onToggle={() => setOpenChipId((v) => (v === "lua" ? null : "lua"))}
+                />
+              ) : null}
             </div>
 
-            <div className="flex w-full flex-wrap justify-center gap-2">
-              {blocks?.forecast.map((d, idx) => (
-                <Chip
-                  key={d.date}
-                  icon={<Droplets className="h-4 w-4" />}
-                  title={idx === 0 ? "Amanhã • Curitiba" : `${formatDayBR(d.date)} • Curitiba`}
-                  value={`${fmtC(d.tMinC)}–${fmtC(d.tMaxC)} • Sens ${fmtC(d.apparentTempMaxC)} • Orv ${fmtC(d.dewPointMaxC)} • Prec ${fmtMm(d.precipitationMm)}${fmtRainProb(d.rainProbMaxPct) ? ` • ${fmtRainProb(d.rainProbMaxPct)}` : ""}${d.cloudCoverAvgPct === null ? "" : ` • Nuv ${fmtPct(d.cloudCoverAvgPct)}`}${d.windMaxKmh === null ? "" : ` • Vento ${formatNumber(d.windMaxKmh, 0)}km/h`}`}
-                  tone="sky"
-                  className="w-[min(100%,520px)]"
-                  open={openChipId === `fc-${d.date}`}
-                  onToggle={() => setOpenChipId((v) => (v === `fc-${d.date}` ? null : `fc-${d.date}`))}
-                />
-              ))}
-            </div>
+            {blocks?.waves?.length ? (
+              <div className="grid w-full grid-cols-2 gap-2">
+                {blocks.waves.slice(0, 2).map((w) => (
+                  <Chip
+                    key={w.place}
+                    icon={<Waves className="h-4 w-4" />}
+                    title={w.place}
+                    value={fmtWaves(w)}
+                    tone="amber"
+                    className="w-full"
+                    open={openChipId === `wave-${w.place}`}
+                    onToggle={() =>
+                      setOpenChipId((v) => (v === `wave-${w.place}` ? null : `wave-${w.place}`))
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

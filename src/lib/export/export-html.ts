@@ -12,38 +12,6 @@ function escapeHtml(s: string) {
     .replaceAll("'", "&#039;");
 }
 
-function rangeToMs(range: RangeKey): number | null {
-  switch (range) {
-    case "1d":
-      return 1 * 864e5;
-    case "7d":
-      return 7 * 864e5;
-    case "1m":
-      return 30 * 864e5;
-    case "6m":
-      return 180 * 864e5;
-    case "1y":
-      return 365 * 864e5;
-  }
-}
-
-function filterByRange(rows: BiometricEntry[], range: RangeKey) {
-  const ms = rangeToMs(range);
-  if (!ms) return rows;
-
-  const times = rows
-    .map((r) => new Date(r.measured_at).getTime())
-    .filter((t) => Number.isFinite(t));
-  const maxT = times.length ? Math.max(...times) : null;
-  const cutoff = maxT ? maxT - ms : null;
-  if (!cutoff) return rows;
-
-  return rows.filter((r) => {
-    const t = new Date(r.measured_at).getTime();
-    return Number.isFinite(t) ? t >= cutoff : true;
-  });
-}
-
 function rangeLabel(range: RangeKey) {
   if (range === "1d") return "1 dia";
   if (range === "1m") return "1 mês";
@@ -91,7 +59,10 @@ export function buildExportHtml(args: {
   fieldDefs: FieldDef[];
   chartJsBundle: string;
 }) {
-  const filtered = filterByRange(args.rows, args.range);
+  // Para ser um espelho fiel do gráfico do app:
+  // - NÃO cortamos registros por tempo aqui.
+  // - A "resolução" afeta apenas a densidade (downsample).
+  const filtered = args.rows;
 
   const columns: Array<{ key: FieldKey; label: string; unit?: string }> = args.fieldDefs.map(
     (f) => ({ key: f.key, label: f.label, unit: f.unit }),
@@ -273,12 +244,16 @@ ${args.chartJsBundle}
 
       const color = palette[idx % palette.length];
       const points = (m.series || []).map(p => ({ x: p.t, y: p.v }));
+      if (!points.length) {
+        el.style.display = 'none';
+        return;
+      }
 
       // Define tamanho fixo do canvas (evita "crescer" infinitamente em alguns browsers mobile)
       canvas.width = Math.max(900, el.clientWidth || 900);
       canvas.height = 260;
 
-      new Chart(ctx, {
+      const chart = new Chart(ctx, {
         type: 'line',
         data: {
           datasets: [{
@@ -327,6 +302,11 @@ ${args.chartJsBundle}
           }
         }
       });
+
+      // Reflow pós-layout (iOS às vezes calcula 0px no primeiro frame)
+      setTimeout(() => {
+        try { chart.resize(); chart.update('none'); } catch {}
+      }, 0);
     });
   </script>
 </body>

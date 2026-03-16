@@ -154,7 +154,7 @@ td.dt .t{color:var(--muted);font-size:11px;margin-top:2px}
 td.notes{max-width:380px;white-space:normal}
 .charts{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
 .svgWrap{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:12px;overflow:hidden}
-.svgWrap svg{width:100%;height:auto;display:block}
+.svgWrap svg{max-width:100%;height:auto;display:block}
 .chart{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:10px;display:flex;flex-direction:column;height:320px}
 .chart .h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 4px 10px}
 .chart .h b{font-size:12px}

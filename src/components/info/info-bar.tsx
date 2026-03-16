@@ -145,31 +145,42 @@ function fmtWaves(w: WaveBlock) {
   return `${h} • ${p} • ${d} (${c})`;
 }
 
-function isSameDay(isoDate: string, base: Date) {
-  const d = new Date(isoDate);
-  return (
-    d.getFullYear() === base.getFullYear() &&
-    d.getMonth() === base.getMonth() &&
-    d.getDate() === base.getDate()
-  );
+function localYmd(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function addLocalDays(base: Date, days: number) {
+  const d = new Date(base);
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + days);
+  return d;
 }
 
 function nextForecastDays(days: ForecastDay[]) {
-  // Open-Meteo devolve [hoje, amanhã, ...]. Queremos começar de amanhã.
+  // Robusto p/ fuso: Open-Meteo entrega YYYY-MM-DD. Evitamos Date("YYYY-MM-DD") (UTC).
+  // Queremos SEMPRE iniciar em "amanhã" (dia seguinte ao dia local atual) e pegar 3 dias.
   const today = new Date();
-  const list = [...days];
-  const withoutToday = list.length && isSameDay(list[0]!.date, today) ? list.slice(1) : list;
-  return withoutToday.slice(0, 3);
+  const tomorrowYmd = localYmd(addLocalDays(today, 1));
+
+  return [...days]
+    .filter((d) => d.date >= tomorrowYmd)
+    .slice(0, 3);
 }
 
-function compactForecastDay(d: ForecastDay) {
+function forecastDayLabel(dateYmd: string, index: number) {
+  if (index === 0) return "Amanhã";
+  return formatDayBR(dateYmd);
+}
+
+function compactForecastDay(d: ForecastDay, label: string) {
   const rain = d.rainProbMaxPct === null ? null : `Chuva ${formatNumber(d.rainProbMaxPct, 0)}%`;
-  return `${formatDayBR(d.date)} • ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}${rain ? ` • ${rain}` : ""}`;
+  return `${label} • ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}${rain ? ` • ${rain}` : ""}`;
 }
 
-function fullForecastDay(d: ForecastDay) {
+function fullForecastDay(d: ForecastDay, label: string) {
   const parts = [
-    `${formatDayBR(d.date)} • ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}`,
+    `${label} • ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}`,
     d.rainProbMaxPct === null ? null : `Chuva ${formatNumber(d.rainProbMaxPct, 0)}%`,
     d.precipitationMm === null ? null : `Prec ${fmtMm(d.precipitationMm)}`,
     d.cloudCoverAvgPct === null ? null : `Nuv ${fmtPct(d.cloudCoverAvgPct)}`,
@@ -179,10 +190,6 @@ function fullForecastDay(d: ForecastDay) {
   ].filter(Boolean) as string[];
 
   return parts.join(" • ");
-}
-
-function forecastTitle(place: string) {
-  return `Previsão — ${place}`;
 }
 
 function compactWeather(w: WeatherBlock) {
@@ -330,14 +337,16 @@ export function InfoBar() {
             {blocks?.forecastNext?.length ? (
               <div className="grid w-full grid-cols-3 gap-2">
                 {blocks.forecastNext.map((d) => {
+                  const idx = blocks.forecastNext.findIndex((x) => x.date === d.date);
+                  const label = forecastDayLabel(d.date, idx === -1 ? 0 : idx);
                   const id = `fc-${d.date}`;
                   const open = openChipId === id;
                   return (
                     <Chip
                       key={d.date}
                       icon={<Droplets className="h-4 w-4" />}
-                      title={forecastTitle("Curitiba")}
-                      value={open ? fullForecastDay(d) : compactForecastDay(d)}
+                      title="Curitiba"
+                      value={open ? fullForecastDay(d, label) : compactForecastDay(d, label)}
                       tone="sky"
                       className="w-full"
                       open={open}

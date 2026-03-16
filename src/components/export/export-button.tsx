@@ -32,6 +32,44 @@ export function ExportButton() {
     }
   }
 
+  async function captureChartPngDataUrlFromDom(): Promise<string | null> {
+    try {
+      const svg = document.querySelector(".recharts-wrapper svg") as SVGSVGElement | null;
+      if (!svg) return null;
+
+      const xml = new XMLSerializer().serializeToString(svg);
+      const svg64 = btoa(unescape(encodeURIComponent(xml)));
+      const svgDataUrl = `data:image/svg+xml;base64,${svg64}`;
+
+      const rect = svg.getBoundingClientRect();
+      const w = Math.max(1, Math.round(rect.width));
+      const h = Math.max(1, Math.round(rect.height));
+
+      // Renderiza a “foto” do SVG em um canvas e retorna PNG.
+      // Isso é o mais robusto no iOS (preview/QuickLook às vezes ignora scripts/SVG).
+      const canvas = document.createElement("canvas");
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const img = new Image();
+      img.decoding = "async";
+      img.src = svgDataUrl;
+      await img.decode();
+
+      // Fundo transparente; se quiser fundo sólido, pintar aqui.
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+
+      return canvas.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }
+
   const disabledReason = useMemo(() => {
     if (!exportSource) return "Abra o painel para carregar os dados";
     if (exportSource.rows.length === 0) return "Sem registros para exportar";
@@ -43,6 +81,7 @@ export function ExportButton() {
     setBusy(true);
     try {
       const chartSvg = captureChartSvgFromDom() ?? exportSource.chartSvg ?? null;
+      const chartPngDataUrl = await captureChartPngDataUrlFromDom();
 
       // Preferimos POST para enviar o SVG real do gráfico atual (cópia fiel).
       // Mantém GET como fallback automático no server (se SVG não vier).
@@ -53,6 +92,7 @@ export function ExportButton() {
           range: exportSource.range,
           metric: exportSource.metric,
           chartSvg,
+          chartPngDataUrl,
         }),
       });
       if (!res.ok) throw new Error(`Falha ao exportar (${res.status})`);

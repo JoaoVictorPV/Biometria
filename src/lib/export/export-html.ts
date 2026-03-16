@@ -20,52 +20,8 @@ function rangeLabel(range: RangeKey) {
   return range.replace("d", " dias");
 }
 
-function rangeToMs(r: RangeKey): number | null {
-  if (r === "1d") return 1 * 864e5;
-  if (r === "7d") return 7 * 864e5;
-  if (r === "1m") return 30 * 864e5;
-  if (r === "6m") return 180 * 864e5;
-  if (r === "1y") return 365 * 864e5;
-  return null;
-}
-
-function maxPointsForRange(range: RangeKey) {
-  // Mesma ideia do app: resolução define densidade, sem estourar performance.
-  return range === "1d"
-    ? 48
-    : range === "7d"
-      ? 140
-      : range === "1m"
-        ? 240
-        : range === "6m"
-          ? 300
-          : 360;
-}
-
-function downsample<T>(arr: T[], max: number) {
-  if (arr.length <= max) return arr;
-  const step = Math.ceil(arr.length / max);
-  return arr.filter((_, idx) => idx % step === 0);
-}
-
-function makeMetricSeries(rows: BiometricEntry[], key: FieldKey, range: RangeKey) {
-  const seriesAll = [...rows]
-    .slice(0, 5000)
-    .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime())
-    .map((r) => {
-      const t = new Date(r.measured_at).getTime();
-      const v = r[key] as number | null;
-      return { t, v };
-    })
-    .filter((p) => p.v !== null && Number.isFinite(p.t));
-
-  const maxT = seriesAll.length ? seriesAll[seriesAll.length - 1]!.t : null;
-  const ms = rangeToMs(range);
-  const cutoff = maxT && ms ? maxT - ms : null;
-  const series = cutoff ? seriesAll.filter((p) => p.t >= cutoff) : seriesAll;
-
-  return downsample(series, maxPointsForRange(range));
-}
+// OBS: Funções de série/ChartJS removidas.
+// Exportação agora embute o gráfico como PNG/SVG (imagem estática) para ser 100% confiável no iOS.
 
 export function buildExportHtml(args: {
   rows: BiometricEntry[];
@@ -73,6 +29,7 @@ export function buildExportHtml(args: {
   fieldDefs: FieldDef[];
   chartJsBundle: string;
   chartSvg?: string | null;
+  chartPngDataUrl?: string | null;
 }) {
   // Espelho fiel do app:
   // - O range define janela (x-axis) a partir do registro mais recente.
@@ -111,24 +68,8 @@ export function buildExportHtml(args: {
     })
     .join("");
 
-  const metrics = args.fieldDefs.map((f) => f.key);
-  const charts = metrics
-    .map((k) => {
-      const def = args.fieldDefs.find((f) => f.key === k)!;
-      return {
-        key: k,
-        label: def.label,
-        unit: def.unit ?? "",
-        series: makeMetricSeries(filtered, k, args.range),
-      };
-    })
-    .filter((m) => m.series.length > 0);
-
-  const dataJson = JSON.stringify({
-    generatedAt: new Date().toISOString(),
-    range: args.range,
-    charts,
-  });
+  // Observação: os dados do gráfico não são usados no HTML final,
+  // pois o gráfico é exportado como PNG/SVG (cópia fiel do app).
 
   const css = `
 :root{color-scheme:light;--muted:#64748b;--line:rgba(15,23,42,.12)}
@@ -153,8 +94,11 @@ td.dt .d{font-weight:700}
 td.dt .t{color:var(--muted);font-size:11px;margin-top:2px}
 td.notes{max-width:380px;white-space:normal}
 .charts{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
+.imgWrap{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:12px;overflow:hidden}
+.imgWrap img{width:100%;height:auto;display:block}
 .svgWrap{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:12px;overflow:hidden}
 .svgWrap svg{max-width:100%;height:auto;display:block}
+.muted{padding:14px;color:var(--muted);font-size:12px}
 .chart{border:1px solid rgba(15,23,42,.10);border-radius:14px;background:rgba(255,255,255,.65);padding:10px;display:flex;flex-direction:column;height:320px}
 .chart .h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 4px 10px}
 .chart .h b{font-size:12px}
@@ -175,6 +119,12 @@ td.notes{max-width:380px;white-space:normal}
   <path d="M14 25.5c3.5-6.5 6.5-6.5 10 0 2.2 4.2 4.6 4.2 7.8-0.5" fill="none" stroke="#0ea5e9" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
   <circle cx="34" cy="25" r="2.6" fill="url(#g1)" opacity=".95"/>
 </svg>`;
+
+  const chartBlock = args.chartPngDataUrl
+    ? `<div class="imgWrap"><img alt="Gráfico" src="${escapeHtml(args.chartPngDataUrl)}" /></div>`
+    : args.chartSvg
+      ? `<div class="svgWrap">${args.chartSvg}</div>`
+      : `<div class="muted">Gráfico indisponível nesta exportação.</div>`;
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -226,68 +176,14 @@ td.notes{max-width:380px;white-space:normal}
       <div class="card">
         <h2>Gráfico</h2>
         <p>Exporta apenas o parâmetro selecionado no app (no mesmo intervalo).</p>
-        <div class="charts" id="charts"></div>
+        <div class="charts">${chartBlock}</div>
       </div>
     </div>
   </div>
 
   <script>
-    // Preferência: se recebemos um SVG do próprio app (Recharts), usamos ele.
-    // Isso garante cópia fiel, sem depender de Chart.js.
-    const CHART_SVG = ${JSON.stringify(args.chartSvg ?? null)};
-    const container = document.getElementById('charts');
-
-    if (CHART_SVG && container) {
-      const el = document.createElement('div');
-      el.className = 'svgWrap';
-      el.innerHTML = CHART_SVG;
-      container.appendChild(el);
-    } else {
-      // Fallback: Chart.js offline (caso o SVG não venha).
-      ${args.chartJsBundle}
-      const EXPORT = ${dataJson};
-      function fmtDate(t){
-        const d = new Date(Number(t));
-        return d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
-      }
-      const palette = ['#0ea5e9', '#a78bfa', '#34d399', '#f59e0b', '#ef4444'];
-      (EXPORT.charts || []).forEach((m, idx) => {
-        const el = document.createElement('div');
-        el.className = 'chart';
-        el.innerHTML = '<div class="h"><b></b><span></span></div><canvas></canvas>';
-        const b = el.querySelector('b');
-        const span = el.querySelector('span');
-        if (b) b.textContent = String(m.label ?? '');
-        if (span) span.textContent = m.unit ? "(" + m.unit + ")" : '';
-        container.appendChild(el);
-        const canvas = el.querySelector('canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const color = palette[idx % palette.length];
-        const points = (m.series || []).map(p => ({ x: p.t, y: p.v }));
-        if (!points.length) { el.style.display = 'none'; return; }
-        canvas.width = Math.max(900, el.clientWidth || 900);
-        canvas.height = 260;
-        const chart = new Chart(ctx, {
-          type: 'line',
-          data: { datasets: [{ label: m.label, data: points, borderColor: color, backgroundColor: color + '22', borderWidth: 2.5, pointRadius: 0, tension: 0.25, fill: true }] },
-          options: {
-            responsive: false,
-            maintainAspectRatio: false,
-            animation: false,
-            parsing: false,
-            devicePixelRatio: 1,
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(2,6,23,.92)', borderColor: 'rgba(255,255,255,.12)', borderWidth: 1, titleColor: 'white', bodyColor: 'white', padding: 10, displayColors: false } },
-            scales: {
-              x: { type: 'linear', grid: { color: 'rgba(15,23,42,.06)' }, ticks: { maxTicksLimit: 6, color: 'rgba(15,23,42,.75)', callback: (v) => fmtDate(v) } },
-              y: { grid: { color: 'rgba(15,23,42,.06)' }, ticks: { color: 'rgba(15,23,42,.75)' } }
-            }
-          }
-        });
-        setTimeout(() => { try { chart.resize(); chart.update('none'); } catch {} }, 0);
-      });
-    }
+    // Sem JS necessário para o gráfico (PNG/SVG já vem embutido no HTML).
+    // Mantemos este script vazio para evitar alguns browsers aplicarem heurísticas estranhas.
   </script>
 </body>
 </html>`;

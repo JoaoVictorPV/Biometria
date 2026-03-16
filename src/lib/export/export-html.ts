@@ -20,6 +20,15 @@ function rangeLabel(range: RangeKey) {
   return range.replace("d", " dias");
 }
 
+function rangeToMs(r: RangeKey): number | null {
+  if (r === "1d") return 1 * 864e5;
+  if (r === "7d") return 7 * 864e5;
+  if (r === "1m") return 30 * 864e5;
+  if (r === "6m") return 180 * 864e5;
+  if (r === "1y") return 365 * 864e5;
+  return null;
+}
+
 function maxPointsForRange(range: RangeKey) {
   // Mesma ideia do app: resolução define densidade, sem estourar performance.
   return range === "1d"
@@ -40,7 +49,7 @@ function downsample<T>(arr: T[], max: number) {
 }
 
 function makeMetricSeries(rows: BiometricEntry[], key: FieldKey, range: RangeKey) {
-  const series = [...rows]
+  const seriesAll = [...rows]
     .slice(0, 5000)
     .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime())
     .map((r) => {
@@ -49,6 +58,11 @@ function makeMetricSeries(rows: BiometricEntry[], key: FieldKey, range: RangeKey
       return { t, v };
     })
     .filter((p) => p.v !== null && Number.isFinite(p.t));
+
+  const maxT = seriesAll.length ? seriesAll[seriesAll.length - 1]!.t : null;
+  const ms = rangeToMs(range);
+  const cutoff = maxT && ms ? maxT - ms : null;
+  const series = cutoff ? seriesAll.filter((p) => p.t >= cutoff) : seriesAll;
 
   return downsample(series, maxPointsForRange(range));
 }
@@ -59,9 +73,10 @@ export function buildExportHtml(args: {
   fieldDefs: FieldDef[];
   chartJsBundle: string;
 }) {
-  // Para ser um espelho fiel do gráfico do app:
-  // - NÃO cortamos registros por tempo aqui.
-  // - A "resolução" afeta apenas a densidade (downsample).
+  // Espelho fiel do app:
+  // - O range define janela (x-axis) a partir do registro mais recente.
+  // - A densidade (downsample) depende do range.
+  // A tabela continua exibindo tudo (até 5000) por robustez/inspeção.
   const filtered = args.rows;
 
   const columns: Array<{ key: FieldKey; label: string; unit?: string }> = args.fieldDefs.map(

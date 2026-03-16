@@ -39,13 +39,20 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
 
   const metricOptions = options as Array<{ value: FieldKey; label: string }>;
 
+  function rangeToMs(r: RangeKey): number | null {
+    if (r === "1d") return 1 * 864e5;
+    if (r === "7d") return 7 * 864e5;
+    if (r === "1m") return 30 * 864e5;
+    if (r === "6m") return 180 * 864e5;
+    if (r === "1y") return 365 * 864e5;
+    return null;
+  }
+
   const data = useMemo(() => {
-    // Evita sobrecarga: por padrão mostramos 30 dias.
-    // Importante: para manter render puro, NÃO usamos Date.now().
-    // A janela é calculada em relação ao registro mais recente.
-    // Agora: sempre plota TODOS os registros (sem corte).
-    // A “resolução” controla apenas o quão detalhado mostramos no eixo X.
-    // Para manter leve, limitamos a quantidade de pontos (downsample simples).
+    // Regra robusta:
+    // - A “resolução” (1d/7d/1m/6m/1a) define a JANELA DE TEMPO no eixo X.
+    // - Para manter leve, fazemos downsample (limite de pontos) dentro da janela.
+    // - A janela é calculada a partir do registro mais recente (não depende de Date.now()).
     const all = [...rows]
       .slice(0, 5000)
       .sort((a, b) => new Date(a.measured_at).getTime() - new Date(b.measured_at).getTime())
@@ -55,6 +62,11 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
         value: r[metric],
       }))
       .filter((d) => d.value !== null && Number.isFinite(d.t));
+
+    const maxT = all.length ? all[all.length - 1]!.t : null;
+    const ms = rangeToMs(currentRange);
+    const cutoff = maxT && ms ? maxT - ms : null;
+    const windowed = cutoff ? all.filter((p) => p.t >= cutoff) : all;
 
     const maxPoints =
       currentRange === "1d"
@@ -67,9 +79,9 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
               ? 300
               : 360;
 
-    if (all.length <= maxPoints) return all;
-    const step = Math.ceil(all.length / maxPoints);
-    return all.filter((_, idx) => idx % step === 0);
+    if (windowed.length <= maxPoints) return windowed;
+    const step = Math.ceil(windowed.length / maxPoints);
+    return windowed.filter((_, idx) => idx % step === 0);
   }, [rows, metric, currentRange]);
 
   return (
@@ -83,8 +95,7 @@ export function EntriesChart({ rows, metric, onMetricChange, range, onRangeChang
             ) : null}
           </CardTitle>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Resolução: {currentRange === "1y" ? "1 ano" : currentRange} • Toque e arraste no
-            gráfico.
+            Intervalo: {currentRange === "1y" ? "1 ano" : currentRange} • Toque e arraste no gráfico.
           </p>
         </div>
         <div className="flex flex-col gap-2 overflow-x-auto sm:items-end">

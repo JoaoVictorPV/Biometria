@@ -145,6 +145,23 @@ function fmtWaves(w: WaveBlock) {
   return `${h} • ${p} • ${d} (${c})`;
 }
 
+function isSameDay(isoDate: string, base: Date) {
+  const d = new Date(isoDate);
+  return (
+    d.getFullYear() === base.getFullYear() &&
+    d.getMonth() === base.getMonth() &&
+    d.getDate() === base.getDate()
+  );
+}
+
+function nextForecastDays(days: ForecastDay[]) {
+  // Open-Meteo devolve [hoje, amanhã, ...]. Queremos começar de amanhã.
+  const today = new Date();
+  const list = [...days];
+  const withoutToday = list.length && isSameDay(list[0]!.date, today) ? list.slice(1) : list;
+  return withoutToday.slice(0, 3);
+}
+
 function compactWeather(w: WeatherBlock) {
   // Resumo útil (retraído): tempo + temperatura + sensação + chuva%.
   const desc = w.weatherDescNow ?? "Tempo";
@@ -195,13 +212,16 @@ export function InfoBar() {
 
   const blocks = useMemo(() => {
     if (!data || !data.ok) return null;
+    const curitibaBlock = data.weather.find((w) => w.place.includes("Curitiba"));
+    const pontalBlock = data.weather.find((w) => w.place.includes("Pontal"));
     return {
-      curitiba: data.weather.find((w) => w.place.includes("Curitiba")),
-      pontal: data.weather.find((w) => w.place.includes("Pontal")),
+      curitiba: curitibaBlock,
+      pontal: pontalBlock,
       today: data.weather[0]?.forecast?.[0] ?? null,
       waves: data.waves,
       forecast: data.weather[0]?.forecast ?? [],
       moon: data.moon,
+      forecastNext: nextForecastDays(curitibaBlock?.forecast ?? []),
     };
   }, [data]);
 
@@ -214,7 +234,7 @@ export function InfoBar() {
 
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2">
         {/* Retráido: apenas hoje de Curitiba + Pontal, lado a lado e compacto */}
-        <div className="grid w-full grid-cols-2 gap-2">
+        <div className="grid w-full grid-cols-3 gap-2">
           {data && !data.ok ? (
             <Chip
               icon={<Moon className="h-4 w-4" />}
@@ -249,6 +269,21 @@ export function InfoBar() {
               onToggle={() => setOpenChipId((v) => (v === "pontal" ? null : "pontal"))}
             />
           ) : null}
+
+          {data && data.ok ? (
+            <button
+              type="button"
+              onClick={() => setOpenChipId((v) => (v === "lua" ? null : "lua"))}
+              className={cn(
+                "flex items-center justify-center rounded-2xl border border-zinc-200/70 bg-white/40 px-3 py-2 text-xs text-zinc-700 shadow-sm backdrop-blur hover:bg-white/60",
+                "dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-200 dark:hover:bg-zinc-950/60",
+              )}
+              title={data.moon.name}
+            >
+              <Moon className="h-4 w-4" />
+              <span className="ml-2 truncate">{data.moon.name}</span>
+            </button>
+          ) : null}
         </div>
 
         {data && data.ok ? (
@@ -269,11 +304,17 @@ export function InfoBar() {
         {data && data.ok && expanded ? (
           <div className="space-y-2">
             <div className="grid w-full grid-cols-2 gap-2">
-              {blocks?.forecast?.[0] ? (
+              {blocks?.forecastNext?.length ? (
                 <Chip
                   icon={<Droplets className="h-4 w-4" />}
                   title="Previsão (Curitiba)"
-                  value={`${formatDayBR(blocks.forecast[0].date)} • ${fmtC(blocks.forecast[0].tMinC)}–${fmtC(blocks.forecast[0].tMaxC)} • ${blocks.forecast[0].rainProbMaxPct === null ? "" : `Chuva ${formatNumber(blocks.forecast[0].rainProbMaxPct, 0)}%`}`.trim()}
+                  value={blocks.forecastNext
+                    .map((d) =>
+                      `${formatDayBR(d.date)} ${fmtC(d.tMinC)}–${fmtC(d.tMaxC)}${
+                        d.rainProbMaxPct === null ? "" : ` • Chuva ${formatNumber(d.rainProbMaxPct, 0)}%`
+                      }`,
+                    )
+                    .join(" • ")}
                   tone="sky"
                   className="w-full"
                   open={openChipId === "forecast"}
@@ -281,22 +322,21 @@ export function InfoBar() {
                 />
               ) : null}
 
-              {data.moon ? (
+              {/* Lua ficou na linha principal; aqui só mostramos se o usuário abrir */}
+              {openChipId === "lua" ? (
                 <Chip
                   icon={<Moon className="h-4 w-4" />}
                   title="Lua"
                   value={data.moon.name}
                   tone="violet"
                   className="w-full"
-                  open={openChipId === "lua"}
-                  onToggle={() => setOpenChipId((v) => (v === "lua" ? null : "lua"))}
                 />
               ) : null}
             </div>
 
             {blocks?.waves?.length ? (
-              <div className="grid w-full grid-cols-2 gap-2">
-                {blocks.waves.slice(0, 2).map((w) => (
+              <div className="grid w-full grid-cols-3 gap-2">
+                {blocks.waves.slice(0, 3).map((w) => (
                   <Chip
                     key={w.place}
                     icon={<Waves className="h-4 w-4" />}
